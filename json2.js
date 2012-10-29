@@ -1,6 +1,6 @@
 /*
     json2.js
-    2012-10-08
+    2012-10-29
 
     Public Domain.
 
@@ -171,26 +171,25 @@ if (typeof JSON !== 'object') {
         return n < 10 ? '0' + n : n;
     }
 
-    if (typeof Date.prototype.toJSON !== 'function') {
+    var toString = Object.prototype.toString;
 
-        Date.prototype.toJSON = function (key) {
-
+    var REPLACERS = {
+        Date: function(key) {
+            var ms = this.valueOf();
             return isFinite(this.valueOf())
-                ? this.getUTCFullYear()     + '-' +
+                ? this.getUTCFullYear()       + '-' +
                     f(this.getUTCMonth() + 1) + '-' +
                     f(this.getUTCDate())      + 'T' +
                     f(this.getUTCHours())     + ':' +
                     f(this.getUTCMinutes())   + ':' +
-                    f(this.getUTCSeconds())   + 'Z'
+                    f(this.getUTCSeconds())   + '.' +
+                    ('00' + (ms % 1000)).slice(-3) + 'Z'
                 : null;
-        };
-
-        String.prototype.toJSON      =
-            Number.prototype.toJSON  =
-            Boolean.prototype.toJSON = function (key) {
-                return this.valueOf();
-            };
-    }
+        },
+        String: String.prototype.valueOf,
+        Number: Number.prototype.valueOf,
+        Boolean: Boolean.prototype.valueOf
+    };
 
     var cx = /[\u0000\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
         escapable = /[\\\"\x00-\x1f\x7f-\x9f\u00ad\u0600-\u0604\u070f\u17b4\u17b5\u200c-\u200f\u2028-\u202f\u2060-\u206f\ufeff\ufff0-\uffff]/g,
@@ -235,13 +234,16 @@ if (typeof JSON !== 'object') {
             length,
             mind = gap,
             partial,
-            value = holder[key];
+            value = holder[key],
+          toJSON;
 
 // If the value has a toJSON method, call it to obtain a replacement value.
 
-        if (value && typeof value === 'object' &&
-                typeof value.toJSON === 'function') {
-            value = value.toJSON(key);
+        if (value && typeof value === 'object') {
+            toJSON = value.toJSON || REPLACERS[toString.call(value).slice(8, -1)];
+            if (typeof toJSON === 'function') {
+                value = toJSON.call(value, key);
+            }
         }
 
 // If we were called with a replacer function, then call the replacer to
@@ -291,7 +293,7 @@ if (typeof JSON !== 'object') {
 
 // Is the value an array?
 
-            if (Object.prototype.toString.apply(value) === '[object Array]') {
+            if (toString.apply(value) === '[object Array]') {
 
 // The value is an array. Stringify every element. Use null as a placeholder
 // for non-JSON values.
